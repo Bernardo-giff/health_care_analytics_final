@@ -1,0 +1,7 @@
+.Rproj.user
+.Rhistory
+.RData
+.Ruserdata
+ICPSR_21600
+images
+*.docx # Removing all word docs from tracking
