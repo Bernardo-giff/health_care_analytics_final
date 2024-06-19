@@ -1,0 +1,234 @@
+---
+title: "Final assignment"
+output: html_document
+date: "2024-06-16"
+---
+
+```{r}
+# Set the working dir
+setwd('/Users/bernardocarvalho/Library/CloudStorage/OneDrive-ImperialCollegeLondon/2024/Health care analytics')
+
+# Get necessary libraries
+library(dplyr)
+install.packages("dplyr")
+```
+
+
+### Loading the data for the first wave
+
+In the table below we can see the the 
+
+![Diagram of the study's structure.](./images/study_diagram.png)
+
+Download analysis ready data here:
+https://www.icpsr.umich.edu/web/DSDR/studies/21600/versions/V25/download/rdata?path=/pcms/studies/0/2/1/6/21600/V25
+
+```{r}
+# Loading the dataset for wave 1
+load("/Users/bernardocarvalho/Library/CloudStorage/OneDrive-ImperialCollegeLondon/2024/Health care analytics/ICPSR_21600/DS0001/21600-0001-Data.rda")
+
+# Renaming the dataset
+w1_data = da21600.0001
+
+# Removing the original uplaod
+rm(da21600.0001)
+```
+
+Let's also get the weights of the first wave
+
+```{r}
+# Loading the dataset for wave 1
+load("/Users/bernardocarvalho/Library/CloudStorage/OneDrive-ImperialCollegeLondon/2024/Health care analytics/ICPSR_21600/DS0004/21600-0004-Data.rda")
+
+# Renaming the dataset
+w1_weights = da21600.0004
+
+# Removing the original uplaod
+rm(da21600.0004)
+```
+
+```{r}
+# Loading the dataset for wave 1
+load("/Users/bernardocarvalho/Library/CloudStorage/OneDrive-ImperialCollegeLondon/2024/Health care analytics/ICPSR_21600/DS0002/21600-0002-Data.rda")
+
+# Renaming the dataset
+w1_contextual = da21600.0002
+
+# Removing the original uplaod
+rm(da21600.0002)
+```
+
+```{r}
+# Loading the dataset for wave 1
+load("/Users/bernardocarvalho/Library/CloudStorage/OneDrive-ImperialCollegeLondon/2024/Health care analytics/ICPSR_21600/DS0003/21600-0003-Data.rda")
+
+# Renaming the dataset
+w1_network = da21600.0003
+
+# Removing the original uplaod
+rm(da21600.0003)
+```
+
+**Classes of interest**
+
+```{r}
+# create a character vector that will be used to
+# limit the first wave consolidated file
+# to only the variables needed
+w1.KeepVars <- c(
+  'H1GH59A'  # What is your height in feet and inches? (Feet in wave 1)
+  
+  , 'H1GH59B' # What is your height in feet and inches? (Inches in wave 1)
+  
+  , 'AID' # Unique identifier
+  
+  , 'H1GH51' # How many hours of sleep do you usually get?
+  
+  , 'BIO_SEX' # Reported sex at birth
+  
+  , 'SCH_YR' # 
+  
+  , 'H1GI1Y' # What is your birth date
+  
+  , 'IYEAR' # Year of the study
+)
+
+# Select specific columns by names
+w1_data <- 
+  w1_data %>% select(w1.KeepVars)
+# View the selected data
+head(w1_data)
+
+```
+```{r}
+# Extract birth year from the year column
+w1_data$birth_year <- as.numeric(str_match(w1_data$H1GI1Y, "\\(\\d+\\)\\s*\\(\\d+\\)\\s*(\\d{4})")[, 2])
+
+# Calculate respondent's age at the time of the study
+w1_data$age <- 1995 - w1_data$birth_year
+
+w1_data
+
+```
+
+```{r}
+# Load the stringr package
+library(stringr)
+
+# Extract the middle parentheses values using regular expressions
+data$middle_value_H1GH59A <- str_match(data$H1GH59A, "\\((\\d+)\\)\\s*\\((\\d+)\\)")[, 3]
+data$middle_value_H1GH59B <- str_match(data$H1GH59B, "\\((\\d+)\\)\\s*\\((\\d+)\\)")[, 3]
+
+# View the data with the extracted values
+data$middle_value_H1GH59A
+
+```
+
+```{r}
+# Convert factor to character
+w1_data$H1GH59A <- as.character(w1_data$H1GH59A)
+w1_data$H1GH59B <- as.character(w1_data$H1GH59B)
+
+# Extract the second number in parentheses
+w1_data$feet_value <- as.numeric(str_match(w1_data$H1GH59A, "\\((\\d+)\\)\\s*\\((\\d+)\\)")[, 3])
+# Extract the second number in parentheses
+w1_data$inch_value <- as.numeric(str_match(w1_data$H1GH59B, "\\((\\d+)\\)\\s*\\((\\d+)\\)")[, 3])
+
+# Convert feet to centimeters (1 foot = 30.48 cm)
+w1_data$feet_value_cm <- w1_data$feet_value * 30.48
+# Convert feet to centimeters (1 inch = 2.54 cm)
+w1_data$inch_value_cm <- w1_data$inch_value * 2.54
+
+# Create height in cm colum
+w1_data$height_cm <- w1_data$feet_value_cm + w1_data$inch_value_cm
+
+# View the data with the extracted and converted values
+w1_data %>% select(c(H1GH59A, H1GH59B, feet_value_cm, inch_value_cm, height_cm))
+```
+
+### Finding patterns across generations
+ Show the distribution of the sleep data
+
+```{r}
+w1_data$H1GH51
+
+library(ggplot2)
+
+# For creating chart, we need to use ggplot() function and provide input data for each axes. Then we use geom_bar() function to apply bar chart specifications and labs() function to put labels on the chart. theme() function has been used to move the title to the center.
+# Change line color and fill color
+ggplot(w1_data, aes(x=H1GH51))+
+  geom_histogram(color="darkblue", fill="lightblue")
+
+```
+
+```{r}
+lm <- lm()
+```
+
+Show the distribution of the height data
+
+```{r}
+
+# Filter out data outside of the acceptable range
+
+
+ggplot(w1_data, aes(x=height_cm))+
+  geom_histogram(color="darkblue", fill="lightblue")
+
+```
+
+
+
+```{r}
+# create a character vector that will be used to
+# limit the first wave consolidated file
+# to only the variables needed
+w1.KeepVars <-
+	c( 
+		"AID" , 		# addhealth longitudinal unique id
+		
+		"bio_sex" ,		# sex
+		
+		"h1gh51"	,	# how many hours of sleep do you usually get
+		
+		"H1GH60", # What is your weight?
+	)
+	
+w2.KeepVars <- 
+  c(
+    "H2GH44",  # How many hours of sleep
+  )
+```
+
+	
+	
+Investigate weight distribution
+
+```{r}
+# Filter out data outside of the acceptable range
+
+w1_data$weight_kg <- w1_data$H1GH60 * 0.453
+
+ggplot(w1_data, aes(x=weight_kg))+
+  geom_histogram(color="darkblue", fill="lightblue")
+
+```
+
+Investigate the BMI distribution
+
+```{r}
+
+w1_data$bmi <- w1_data$weight_kg / ((w1_height_cm/100)^2)
+
+ggplot(w1_data, aes(x=bmi))+
+  geom_histogram(color="darkblue", fill="lightblue")
+
+
+```
+```{r}
+ols <- lm(bmi ~ H1GH51, data=w1_data)
+
+library(stargazer)
+
+stargazer(ols, type='text')
+```
