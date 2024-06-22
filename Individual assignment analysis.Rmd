@@ -4,7 +4,11 @@ output: html_document
 date: "2024-06-16"
 ---
 
-See the [git repo here](https://github.com/Bernardo-giff/health_care_analytics_final)
+# Introduction
+
+Based on the article [Beautiful inside and out: Peer characteristics and academic performance](https://www.sciencedirect.com/science/article/pii/S0167268123004316?via%3Dihub), we propose a similar study where we investigate the relantionship between attractiveness  in adolescence and substance abuse later on. For that, we ustilize data from waves 1 and 3. 
+
+In this file, we will focus on the code and statistical methods to produce the anaysis. This is also available in the remote repo: [git repo here](https://github.com/Bernardo-giff/health_care_analytics_final)
 
 ```{r}
 # Set the working dir
@@ -12,6 +16,10 @@ setwd('/Users/bernardocarvalho/Library/CloudStorage/OneDrive-ImperialCollegeLond
 
 # Get necessary libraries
 library(dplyr)
+library(stargazer)
+library(stringr)
+library(ggplot2)
+
 ```
 
 
@@ -21,54 +29,134 @@ In the table below we can see the the
 
 ![Diagram of the study's structure.](./images/study_diagram.png)
 
-Download analysis ready data here:
-https://www.icpsr.umich.edu/web/DSDR/studies/21600/versions/V25/download/rdata?path=/pcms/studies/0/2/1/6/21600/V25
+Download analysis [ready data here](https://www.icpsr.umich.edu/web/DSDR/studies/21600/versions/V25/download/rdata?path=/pcms/studies/0/2/1/6/21600/V25)
 
 ```{r}
-# Loading the dataset for wave 1
-load("/Users/bernardocarvalho/Library/CloudStorage/OneDrive-ImperialCollegeLondon/2024/Health care analytics/ICPSR_21600/DS0001/21600-0001-Data.rda")
+# Set dir for the files
+path = "ICPSR_21600/"
+
+# Loading the dataset (in-home) for wave 1
+load(paste0(path, "DS0001/21600-0001-Data.rda"))
+
+# Loading the dataset (in-home) for wave 3
+load(paste0(path, "DS0008/21600-0008-Data.rda"))
+
+# Loading the dataset (grades) for wave 3
+load(paste0(path, "DS0016/21600-0016-Data.rda"))
+
 
 # Renaming the dataset
 w1_data = da21600.0001
 
+# Renaming the dataset
+w3_data = da21600.0008
+
+w3_acad = da21600.0016
+
 # Removing the original uplaod
 rm(da21600.0001)
+# Removing the original uplaod
+rm(da21600.0008)
+# Removing the original uplaod
+rm(da21600.0016)
+
+# Finally, we create a dataset composed of the merged data from the two waves
+data = merge(w1_data, w3_data, by = "AID")
+
+data = merge(data, w3_acad, by = "AID")
+
+# Removing w1 data
+rm(w1_data)
+# Removing w3 data
+rm(w3_data)
+
 ```
 
-Let's also get the weights of the first wave
+
+For simplicity, we will also rename the variables that will be used in the regression
 
 ```{r}
-# Loading the dataset for wave 1
-load("/Users/bernardocarvalho/Library/CloudStorage/OneDrive-ImperialCollegeLondon/2024/Health care analytics/ICPSR_21600/DS0004/21600-0004-Data.rda")
-
-# Renaming the dataset
-w1_weights = da21600.0004
-
-# Removing the original uplaod
-rm(da21600.0004)
+# Rename columns using dplyr
+data <- data %>%
+  rename(
+    w1_phi_attr = H1IR1,
+    w1_per_attr = H1IR2,
+    w1_groom = H1IR3,
+    w3_used_drugs = H3TO117,
+  )
 ```
 
 ```{r}
-# Loading the dataset for wave 1
-load("/Users/bernardocarvalho/Library/CloudStorage/OneDrive-ImperialCollegeLondon/2024/Health care analytics/ICPSR_21600/DS0002/21600-0002-Data.rda")
+# Define columns to keep
 
-# Renaming the dataset
-w1_contextual = da21600.0002
+data$w3_used_drugs <- as.character(data$w3_used_drugs)
 
-# Removing the original uplaod
-rm(da21600.0002)
+# Extract the second number in parentheses
+data$w3_used_drugs_bin <- as.numeric(str_match(data$w3_used_drugs, "\\((\\d+)\\)\\s*\\((\\d+)\\)")[, 3])
+
+# Remove rows with NA in the drug response
+data <- data[!is.na(data$w3_used_drugs_bin), ]
 ```
 
 ```{r}
-# Loading the dataset for wave 1
-load("/Users/bernardocarvalho/Library/CloudStorage/OneDrive-ImperialCollegeLondon/2024/Health care analytics/ICPSR_21600/DS0003/21600-0003-Data.rda")
 
-# Renaming the dataset
-w1_network = da21600.0003
+data$H3TO38 <- as.character(data$H3TO38)
 
-# Removing the original uplaod
-rm(da21600.0003)
+# Extract the second number in parentheses
+data$w3_alc_freq <- as.numeric(str_match(data$H3TO38, "\\((\\d+)\\)\\s*\\((\\d+)\\)")[, 3])
+
+# Filter out responses without alcohol
+data <- data[!is.na(data$w3_alc_freq), ]
 ```
+
+```{r}
+
+ols = lm(EAOGPAC ~ w1_phi_attr + w1_per_attr + BIO_SEX, data=data[!is.na(data$EAOGPAC), ])
+
+stargazer(ols, type='text')
+```
+
+Similar to the approach of the article, we try to simplify the attractiveness variable to a binary variable:
+
+1 if scored attractive or very attractive.
+0 otherwise
+
+Hence:
+```{r}
+
+# Convert data to character
+data$w1_per_attr <- as.character(data$w1_per_attr)
+
+# Extract the second number in parentheses
+data$w1_per_attr <- as.numeric(str_match(data$w1_per_attr, "\\((\\d+)\\)\\s*\\((\\d+)\\)")[, 3])
+
+data$w1_per_attr_new <- ifelse(data$w1_per_attr %in% c(5, 6), 1, 0)
+
+# Convert data to character
+data$w1_phi_attr <- as.character(data$w1_phi_attr)
+
+# Extract the second number in parentheses
+data$w1_phi_attr <- as.numeric(str_match(data$w1_phi_attr, "\\((\\d+)\\)\\s*\\((\\d+)\\)")[, 3])
+
+data$w1_phi_attr_new <- ifelse(data$w1_phi_attr %in% c(5, 6), 1, 0)
+
+```
+
+```{r}
+data$male <- ifelse(data$BIO_SEX == '(1) (1) Male',1,0)
+
+data$male
+```
+
+```{r}
+
+data$log_EAOGPAC <- log(data$EAOGPAC)
+
+ols = lm(log_EAOGPAC ~ w1_phi_attr_new*male + w1_per_attr_new*male, data=data[!is.na(data$EAOGPAC) & !apply(data, 1, function(row) any(is.infinite(row))), ])
+
+stargazer(ols, type='text')
+```
+
 
 **Classes of interest**
 
@@ -93,7 +181,16 @@ w1.KeepVars <- c(
   
   , 'IYEAR' # Year of the study
   
-  , 'H1GH60, # What is your weight? (in pounds)
+  , 'H1GH60' # What is your weight? (in pounds)
+  
+  , 'H1IR1' # How phisically attractive is the respondent
+  
+  , 'H1IR2' # How attractive is the respondent's personality?
+
+  , 'H1IR3' # How well-groomed is the respondent?
+  
+  , 'H1IR5' # How physically mature was the respondent compared with other adolescents of {HIS/HER} age?
+
 )
 
 # Select specific columns by names
@@ -114,6 +211,30 @@ w1_data$birth_year <- as.numeric(str_match(w1_data$H1GI1Y, "\\(\\d+\\)\\s*\\(\\d
 w1_data$age <- 1995 - w1_data$birth_year
 
 ```
+
+
+```{r}
+w3.KeepVars <- c(
+  'AID' # Unique ID
+  
+  , 'H3TO117' # Since June 1995, have you used any other types of illegal drugs, such as LSD, PCP, ecstasy, mushrooms, inhalants,                 #  ice, heroin, or prescription medicines not prescribed for you?
+)
+```
+
+```{r}
+w3_data <- 
+  w3_data %>% select(w3.KeepVars
+w3_data
+```
+```{r}
+# Merging data frames based on AID
+merged_df <- merge(w1_data, w3_data, by = "AID")
+```
+
+```{r}
+
+```
+
 
 Cleaning up the data
 
@@ -144,7 +265,7 @@ w1_data$feet_value_cm <- w1_data$feet_value * 30.48
 # Convert feet to centimeters (1 inch = 2.54 cm)
 w1_data$inch_value_cm <- w1_data$inch_value * 2.54
 
-# Create height in cm colum
+# Create height in cm column
 w1_data$height_cm <- w1_data$feet_value_cm + w1_data$inch_value_cm
 
 # View the data with the extracted and converted values
@@ -157,9 +278,9 @@ w1_data %>% select(c(H1GH59A, H1GH59B, feet_value_cm, inch_value_cm, height_cm))
  Show the distribution of the sleep data
 
 ```{r}
-w1_data$H1GH51
 
-library(ggplot2)
+
+
 
 # For creating chart, we need to use ggplot() function and provide input data for each axes. Then we use geom_bar() function to apply bar chart specifications and labs() function to put labels on the chart. theme() function has been used to move the title to the center.
 # Change line color and fill color
@@ -193,7 +314,7 @@ Investigate the BMI distribution
 
 ```{r}
 
-w1_data$bmi <- w1_data$weight_kg / ((w1_height_cm/100)^2)
+w1_data$bmi <- w1_data$weight_kg / ((w1_data$height_cm/100)^2)
 
 ggplot(w1_data, aes(x=bmi))+
   geom_histogram(color="darkblue", fill="lightblue")
@@ -207,3 +328,18 @@ library(stargazer)
 
 stargazer(ols, type='text')
 ```
+At a firts glance, it seems that bmi and ours of sleep are highly correlated. However, we must continue the investigation as several other cofounding factors can be at play here. First, we will see what is the effect of age in this, as we know age is an important factor in sleep
+
+```{r}
+ols <- lm(bmi ~ H1GH51 + age, data=w1_data)
+
+library(stargazer)
+
+
+stargazer(ols, type='text')
+
+```
+
+Age already plays a significant role in the regression.
+
+
