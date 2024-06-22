@@ -4,13 +4,14 @@ output: html_document
 date: "2024-06-16"
 ---
 
+See the [git repo here](https://github.com/Bernardo-giff/health_care_analytics_final)
+
 ```{r}
 # Set the working dir
 setwd('/Users/bernardocarvalho/Library/CloudStorage/OneDrive-ImperialCollegeLondon/2024/Health care analytics')
 
 # Get necessary libraries
 library(dplyr)
-install.packages("dplyr")
 ```
 
 
@@ -91,6 +92,8 @@ w1.KeepVars <- c(
   , 'H1GI1Y' # What is your birth date
   
   , 'IYEAR' # Year of the study
+  
+  , 'H1GH60, # What is your weight? (in pounds)
 )
 
 # Select specific columns by names
@@ -101,28 +104,18 @@ head(w1_data)
 
 ```
 ```{r}
+# Load library
+library(stringr)
+
 # Extract birth year from the year column
 w1_data$birth_year <- as.numeric(str_match(w1_data$H1GI1Y, "\\(\\d+\\)\\s*\\(\\d+\\)\\s*(\\d{4})")[, 2])
 
 # Calculate respondent's age at the time of the study
 w1_data$age <- 1995 - w1_data$birth_year
 
-w1_data
-
 ```
 
-```{r}
-# Load the stringr package
-library(stringr)
-
-# Extract the middle parentheses values using regular expressions
-data$middle_value_H1GH59A <- str_match(data$H1GH59A, "\\((\\d+)\\)\\s*\\((\\d+)\\)")[, 3]
-data$middle_value_H1GH59B <- str_match(data$H1GH59B, "\\((\\d+)\\)\\s*\\((\\d+)\\)")[, 3]
-
-# View the data with the extracted values
-data$middle_value_H1GH59A
-
-```
+Cleaning up the data
 
 ```{r}
 # Convert factor to character
@@ -133,6 +126,18 @@ w1_data$H1GH59B <- as.character(w1_data$H1GH59B)
 w1_data$feet_value <- as.numeric(str_match(w1_data$H1GH59A, "\\((\\d+)\\)\\s*\\((\\d+)\\)")[, 3])
 # Extract the second number in parentheses
 w1_data$inch_value <- as.numeric(str_match(w1_data$H1GH59B, "\\((\\d+)\\)\\s*\\((\\d+)\\)")[, 3])
+
+# Filter feet value for the acceptable range
+w1_data <- w1_data[!is.na(w1_data$feet_value) & w1_data$feet_value >= 4 & w1_data$feet_value <= 7, ]
+
+# Filter inch values for the acceptbale range
+w1_data <- w1_data[!is.na(w1_data$inch_value) & w1_data$inch_value >= 0 & w1_data$inch_value <= 9, ]
+```
+
+
+
+
+```{r}
 
 # Convert feet to centimeters (1 foot = 30.48 cm)
 w1_data$feet_value_cm <- w1_data$feet_value * 30.48
@@ -145,6 +150,8 @@ w1_data$height_cm <- w1_data$feet_value_cm + w1_data$inch_value_cm
 # View the data with the extracted and converted values
 w1_data %>% select(c(H1GH59A, H1GH59B, feet_value_cm, inch_value_cm, height_cm))
 ```
+
+
 
 ### Finding patterns across generations
  Show the distribution of the sleep data
@@ -161,46 +168,14 @@ ggplot(w1_data, aes(x=H1GH51))+
 
 ```
 
-```{r}
-lm <- lm()
-```
-
 Show the distribution of the height data
 
 ```{r}
-
-# Filter out data outside of the acceptable range
-
-
 ggplot(w1_data, aes(x=height_cm))+
   geom_histogram(color="darkblue", fill="lightblue")
 
 ```
 
-
-
-```{r}
-# create a character vector that will be used to
-# limit the first wave consolidated file
-# to only the variables needed
-w1.KeepVars <-
-	c( 
-		"AID" , 		# addhealth longitudinal unique id
-		
-		"bio_sex" ,		# sex
-		
-		"h1gh51"	,	# how many hours of sleep do you usually get
-		
-		"H1GH60", # What is your weight?
-	)
-	
-w2.KeepVars <- 
-  c(
-    "H2GH44",  # How many hours of sleep
-  )
-```
-
-	
 	
 Investigate weight distribution
 
