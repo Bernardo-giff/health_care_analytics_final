@@ -1,5 +1,6 @@
 ---
-title: "Final assignment"
+title: "Health care analytics individual assignment"
+subtitle: "The relantionship between attractivenss (phisical and personality) in academic achievement"
 output: html_document
 date: "2024-06-16"
 ---
@@ -19,6 +20,7 @@ library(dplyr)
 library(stargazer)
 library(stringr)
 library(ggplot2)
+library(UpSetR)
 
 ```
 
@@ -74,7 +76,7 @@ rm(w3_data)
 For simplicity, we will also rename the variables that will be used in the regression
 
 ```{r}
-# Rename columns using dplyr
+# Rename independent variables using dplyr
 data <- data %>%
   rename(
     w1_phi_attr = H1IR1,
@@ -85,6 +87,31 @@ data <- data %>%
 ```
 
 # Data cleaning and EDA
+
+After selecting the variables of interest based on our assumptions, we start investigating for the quality and making decision about to keep. Firstly, we investigate missing values in the dependent variables that will used for the study.
+
+```{r}
+data_candidates <- data %>%
+  select(
+    # Independent variables
+    w1_phi_attr
+    , w1_per_attr
+    , w1_phi_mat
+    , w1_groom
+    # Dependent variable
+    , EAOGPAC
+  )
+library(UpSetR)
+gg_miss_upset(data_candidates)
+
+```
+
+```{r}
+# For creating chart, we need to use ggplot() function and provide input data for each axes. Then we use geom_bar() function to apply bar chart specifications and labs() function to put labels on the chart. theme() function has been used to move the title to the center.
+# Change line color and fill color
+ggplot(w1_data, aes(x=H1GH51))+
+  geom_histogram(color="darkblue", fill="lightblue")
+```
 
 # Regression
 
@@ -140,94 +167,3 @@ ols = lm(EAOGPAC ~ w1_phi_attr_new*male + w1_per_attr_new*male + w1_phi_mat_new,
 
 stargazer(ols, type='text')
 ```
-
-**Classes of interest**
-
-Cleaning up the data
-
-```{r}
-# Convert factor to character
-w1_data$H1GH59A <- as.character(w1_data$H1GH59A)
-w1_data$H1GH59B <- as.character(w1_data$H1GH59B)
-
-# Extract the second number in parentheses
-w1_data$feet_value <- as.numeric(str_match(w1_data$H1GH59A, "\\((\\d+)\\)\\s*\\((\\d+)\\)")[, 3])
-# Extract the second number in parentheses
-w1_data$inch_value <- as.numeric(str_match(w1_data$H1GH59B, "\\((\\d+)\\)\\s*\\((\\d+)\\)")[, 3])
-
-# Filter feet value for the acceptable range
-w1_data <- w1_data[!is.na(w1_data$feet_value) & w1_data$feet_value >= 4 & w1_data$feet_value <= 7, ]
-
-# Filter inch values for the acceptbale range
-w1_data <- w1_data[!is.na(w1_data$inch_value) & w1_data$inch_value >= 0 & w1_data$inch_value <= 9, ]
-```
-
-```{r}
-
-# Convert feet to centimeters (1 foot = 30.48 cm)
-w1_data$feet_value_cm <- w1_data$feet_value * 30.48
-# Convert feet to centimeters (1 inch = 2.54 cm)
-w1_data$inch_value_cm <- w1_data$inch_value * 2.54
-
-# Create height in cm column
-w1_data$height_cm <- w1_data$feet_value_cm + w1_data$inch_value_cm
-
-# View the data with the extracted and converted values
-w1_data %>% select(c(H1GH59A, H1GH59B, feet_value_cm, inch_value_cm, height_cm))
-```
-
-### Finding patterns across generations
-
-Show the distribution of the sleep data
-
-```{r}
-# For creating chart, we need to use ggplot() function and provide input data for each axes. Then we use geom_bar() function to apply bar chart specifications and labs() function to put labels on the chart. theme() function has been used to move the title to the center.
-# Change line color and fill color
-ggplot(w1_data, aes(x=H1GH51))+
-  geom_histogram(color="darkblue", fill="lightblue")
-
-```
-
-Show the distribution of the height data
-
-```{r}
-ggplot(w1_data, aes(x=height_cm))+
-  geom_histogram(color="darkblue", fill="lightblue")
-
-```
-
-Investigate weight distribution
-
-```{r}
-# Filter out data outside of the acceptable range
-
-w1_data$weight_kg <- w1_data$H1GH60 * 0.453
-
-ggplot(w1_data, aes(x=weight_kg))+
-  geom_histogram(color="darkblue", fill="lightblue")
-
-```
-
-Investigate the BMI distribution
-
-```{r}
-
-w1_data$bmi <- w1_data$weight_kg / ((w1_data$height_cm/100)^2)
-
-ggplot(w1_data, aes(x=bmi))+
-  geom_histogram(color="darkblue", fill="lightblue")
-
-
-```
-
-```{r}
-ols <- lm(bmi ~ H1GH51, data=w1_data)
-
-library(stargazer)
-
-stargazer(ols, type='text')
-```
-
-At a firts glance, it seems that bmi and ours of sleep are highly correlated. However, we must continue the investigation as several other cofounding factors can be at play here. First, we will see what is the effect of age in this, as we know age is an important factor in sleep
-
-Age already plays a significant role in the regression.
