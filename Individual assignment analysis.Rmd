@@ -41,51 +41,25 @@ path = "ICPSR_21600/"
 # Loading the dataset (in-home) for wave 1
 load(paste0(path, "DS0001/21600-0001-Data.rda"))
 
-# Loading the dataset (in-home) for wave 3
-load(paste0(path, "DS0008/21600-0008-Data.rda"))
+# Loading context data for wave 1
+load(paste0(path, "DS0002/21600-0002-Data.rda"))
 
-# Loading the dataset (grades) for wave 3
-load(paste0(path, "DS0016/21600-0016-Data.rda"))
+# Loading the dataset (multi-modal) for wave 5
+load(paste0(path, "DS0032/21600-0032-Data.rda"))
 
-
-# Renaming the dataset
+# Renaming the datasets
 w1_data = da21600.0001
+w1_contextual = da21600.0002
+w5_data = da21600.0032
 
-# Renaming the dataset
-w3_data = da21600.0008
-
-w3_acad = da21600.0016
-
-# Removing the original uplaod
+# Removing the original uploads
 rm(da21600.0001)
-# Removing the original uplaod
-rm(da21600.0008)
-# Removing the original uplaod
-rm(da21600.0016)
+rm(da21600.0002)
+rm(da21600.0032)
 
-# Finally, we create a dataset composed of the merged data from the two waves
-data = merge(w1_data, w3_data, by = "AID")
-
-data = merge(data, w3_acad, by = "AID")
-
-# Removing w1 data
-rm(w1_data)
-# Removing w3 data
-rm(w3_data)
-
-```
-
-For simplicity, we will also rename the variables that will be used in the regression
-
-```{r}
-# Rename independent variables using dplyr
-data <- data %>%
-  rename(
-    w1_phi_attr = H1IR1,
-    w1_per_attr = H1IR2,
-    w1_phi_mat = H1IR5,
-    w1_groom = H1IR3,
-  )
+# Finally, we create a dataset composed of the merging of wave data 1 and 5
+data = merge(w1_data, w1_contextual, by = "AID")
+data = merge(data, w5_data, by = "AID")
 ```
 
 # Data cleaning and EDA
@@ -93,65 +67,287 @@ data <- data %>%
 After selecting the variables of interest based on our assumptions, we start investigating for the quality and making decision about to keep. Firstly, we investigate missing values in the dependent variables that will used for the study.
 
 ```{r}
-value_counts <- table(data$w1_phi_mat)
+# 
+data <- data %>%
+  select(   
+    H5ID3              # Weight in pounds (wave 5)
+    , H5ID2F             # Height in feet (wave 5)
+    , H5ID2I             # Height in inches (wave 5)
+    , AID                # Respondent Identifier
+    , BIO_SEX            # Biological Sex - Wave I
+    , H1GI1Y             # Birth Year - Wave I
+    , H1GH59A            # Height in feet - Wave I
+    , H1GH59B            # Height in inches - Wave I 
+    , H1GH60             # Weight in pounds - Wave I
+    , S63                # Exercise - Wave I
+    , H1WP8              # Dinner with Parents - Wave I
+    , H1GH34             # Ate Vegetables Yesterday - Wave I
+    , H1WP7              # Make Own Decisions About Diet - Wave I
+    # What do you usually have for breakfast on a weekday morning?
+    , H1GH23A            # Milk
+    , H1GH23B            # coffee or tea
+    , H1GH23C            # cereal
+    , H1GH23D            # fruit, juice
+    , H1GH23E            # eggs
+    , H1GH23F            # meat
+    , H1GH23G            # snack food
+    , H1GH23H            # bread toast or rolls
+    , H1GH23I            # other items
+    , H1GH23J            # Nothing
+    # End of "What do you usually have for breakfast on a weekday morning?" blcok
+    , H1GH1              # General Health - Wave I
+    , H1GH51             # Sleep - Wave I
+    , H1FS6              # Felt Depressed - Wave I
+    , H1TS4              # Learned Problems of Obesity - Wave I
+    , H1TS1              # Learned Proper Diet - Wave I
+    , PA55               # Total Household Income 1994
+    , BST90P02           # Modal Race (Wave 1 context)
+    , BST90P08           # Modal Marital Status (Wave 1 context)
+    , BST90P01           # Urbanicity Code (Wave 1 context)
+  )
 
-value_counts
+
+
 ```
 
 ```{r}
-data_candidates <- data %>%
-  select(
-    # Independent variables
-    w1_phi_attr
-    , w1_per_attr
-    , w1_phi_mat
-    , w1_groom
-    , BIO_SEX
-    # Dependent variable
-    , EAOGPAC
-  )
-
-vis_miss(data_candidates)
-
+# Plotting missing data density
+vis_miss(data)
 
 ```
-
-Using the gg_miss plot from the naniar package, we check the intersections of the missing variables.
 
 ```{r}
 # Plotting the intersection between missing values
-gg_miss_upset(data_candidates)
+gg_miss_upset(data)
 ```
+
+Besides the exercise and total household income variables, we see that there are few missing values for all of the other variables.
 
 We realize there is no relevant amount of data missing nor a clear interaction or pattern in that. Therefore, we can safely drop the missing values.
 
+Next we need to transform the height and weight variables to the metric system. Both our independent and dependent variables rely on it.
+
 ```{r}
-data <-data %>%
+
+# Convert weight and height measures to the metric system
+data <- data %>%
+  mutate(
+    # Convert height of Wave 1 to numeric
+    w1_height_feet = as.numeric(sub(".*\\) (\\d+).*", "\\1", as.character(H1GH59A))),
+    w1_height_inches = as.numeric(sub(".*\\) (\\d+).*", "\\1", as.character(H1GH59B))),
+    
+    # Combine height data from feet and inches to total inches
+    w1_total_inches = (w1_height_feet * 12) + w1_height_inches,
+    
+    # Convert height from inches to meters
+    w1_height_cm = w1_total_inches * 0.0254,
+    
+    # Convert weight from pounds to kilograms
+    w1_weight_kg = H1GH60 * 0.453592,
+    
+    # Calculate bmi in weight 1
+    w1_bmi = w1_weight_kg / ((w1_height_cm/100) ^ 2),
+    
+    # Convert height of Wave 5 to numeric
+    w5_height_feet = as.numeric(sub(".*\\) (\\d+).*", "\\1", as.character(H5ID2F))),
+    w5_height_inches = as.numeric(sub(".*\\) (\\d+).*", "\\1", as.character(H5ID2I))),
+    
+    # Combine height data from feet and inches to total inches
+    w5_total_inches = (w5_height_feet * 12) + w5_height_inches,
+    
+    # Convert height from inches to meters
+    w5_height_cm = w5_total_inches * 0.0254,
+    
+    # Convert weight from pounds to kilograms
+    w5_weight_kg = H5ID3 * 0.453592,
+    
+    # Calculate bmi in weight 5
+    w5_bmi = w5_weight_kg / ((w5_height_cm/100) ^ 2)
+    
+  )  %>%
+  # Drop auxiliary columns created
   select(
-    # Independent variables
-    w1_phi_attr,
-    w1_per_attr,
-    w1_phi_mat,
-    w1_groom,
-    BIO_SEX,
-    # Dependent variable
-    EAOGPAC
-  ) %>%
-  drop_na()
+    -w1_height_feet
+    , -w1_height_inches
+    , -w1_total_inches
+    , -w1_height_cm
+    , -w1_weight_kg
+    , -w5_height_feet
+    , -w5_height_inches
+    , -w5_total_inches
+    , -w5_height_cm
+    , -w5_weight_kg
+    , -H1GH59A
+    , -H1GH59B
+    , -H5ID2F
+    , -H5ID2I
+    , -H1GH60
+    , -H5ID3
+    )
 ```
+
+```{r}
+data
+```
+
+```{r}
+
+# Convert categorical variables to factors, handle missing values, and convert to appropriate types
+data <- data %>%
+  mutate(
+    # Convert Sex to factors, handle missing values
+    BIO_SEX = factor(BIO_SEX, 
+                     levels = 
+                       c("(1) (1) Male"
+                         , "(2) (2) Female"
+                         , "(6) (6) Refused"), 
+                     labels = 
+                       c("Male"
+                         , "Female"
+                         , "Refused"))
+    # Convert refused to NA
+    , BIO_SEX = replace(BIO_SEX, BIO_SEX == "Refused", NA)
+    
+    # Convert Exercise to factors, handle missing values
+    , w5_exercise = factor(S63, 
+                         levels = 
+                           c("(0) (0) Never"
+                             , "(1) (1) 1 or 2 times"
+                             , "(2) (2) 3 to 5 times"
+                             , "(3) (3) 6 or 7 times"
+                             , "(4) (4) More than 7 times"
+                             , "(9) (9) Multiple response"), 
+                         labels = 
+                           c("Never"
+                             , "1 or 2 times"
+                             , "3 to 5 times"
+                             , "6 or 7 times"
+                             , "More than 7 times"
+                             , "Multiple response")),
+    
+    # Convert multiple response to NA
+    , w5_exercise = replace(S63, S63 == "Multiple response", NA)
+    
+    # Convert Days_Having_Dinner_with_Parents to numeric, handle missing values
+    , w1_dinner_with_parents = as.numeric(sub(".*\\) (\\d+).*", "\\1", 
+                               as.character(H1WP8)))
+    
+    # Coalesce NAs
+    , w1_dinner_with_parents = replace(w1_dinner_with_parents, 
+                                       w1_dinner_with_parents %in% c(96, 97, 98), NA)
+    
+    # Convert General_Health to factors, handle missing values
+    , w1_general_health = factor(H1GH1, 
+                                 levels = 
+                                   c("(1) (1) Excellent"
+                                     , "(2) (2) Very good"
+                                     , "(3) (3) Good"
+                                     , "(4) (4) Fair"
+                                     , "(5) (5) Poor"
+                                     , "(6) (6) Refused"
+                                     , "(8) (8) Don't know"),
+                                  labels = 
+                                    c("Excellent"
+                                      , "Very good"
+                                      , "Good"
+                                      , "Fair"
+                                      , "Poor"
+                                      , "Refused"
+                                      , "Don't know"))
+    
+    # Coalesce NAs
+    , w1_general_health = replace(w1_general_health
+                                , w1_general_health %in% c("Refused", "Don't know"), NA)
+    
+    # Convert Learned_Problems_of_Obesity to factors, handle missing values
+    , w1_learned_problems_obesity = factor(H1TS4, 
+                                         levels = 
+                                           c("(0) (0) No"
+                                             , "(1) (1) Yes"
+                                             , "(6) (6) Refused"
+                                             , "(8) (8) Don't know"),
+                                         labels = 
+                                           c("No"
+                                             , "Yes"
+                                             , "Refused"
+                                             , "Don't know")),
+    # Coalesce NAs
+    w1_learned_problems_obesity = replace(w1_learned_problems_obesity, 
+                                          w1_learned_problems_obesity %in% 
+                                            c("Refused", "Don't know"), NA),
+    
+    # Convert Learned_Proper_Diet to factors, handle missing values
+    w1_learned_diet = factor(H1TS1, 
+                             levels = 
+                               c("(0) (0) No"
+                                 , "(1) (1) Yes"
+                                 , "(6) (6) Refused"
+                                 , "(8) (8) Don't know"),
+                              labels = 
+                               c("No"
+                                 , "Yes"
+                                 , "Refused"
+                                 , "Don't know"))
+    # Coalesce NAs
+    , w1_learned_diet = replace(w1_learned_diet, 
+                              w1_learned_diet %in% c("Refused", "Don't know"), NA)
+    
+    # Convert usual breakfast data
+    , w1_usual_breakfast_milk = factor(H1GH23A, 
+                             levels = 
+                               c("(0) (0) Not marked"
+                                 , "(1) (1) Marked"
+                                 , "(6) (6) Refused"
+                                 , "(8) (8) Don't know"),
+                              labels = 
+                               c("No"
+                                 , "Yes"
+                                 , "Refused"
+                                 , "Don't know"))
+    # Coalesce NAs
+    , w1_usual_breakfast_milk = replace(w1_usual_breakfast_milk, 
+                              w1_usual_breakfast_milk %in% c("Refused", "Don't know"), NA)
+    
+    # Convert usual breakfast data
+    , w1_usual_breakfast_coffee = factor(H1GH23B, 
+                             levels = 
+                               c("(0) (0) Not marked"
+                                 , "(1) (1) Marked"
+                                 , "(6) (6) Refused"
+                                 , "(8) (8) Don't know"),
+                              labels = 
+                               c("No"
+                                 , "Yes"
+                                 , "Refused"
+                                 , "Don't know"))
+    # Coalesce NAs
+    , w1_usual_breakfast_coffee = replace(w1_usual_breakfast_coffee, 
+                              w1_usual_breakfast_coffee %in% c("Refused", "Don't know"), NA)
+    
+    
+    , w1_income_1994 = PA55 * 1000
+    )
+```
+
+```{r}
+data
+```
+
+We proceed by investigating the distributions of the variables chosen for analyses to lay out our hypotheses.
 
 ```{r}
 # For creating chart, we need to use ggplot() function and provide input data for each axes. Then we use geom_bar() function to apply bar chart specifications and labs() function to put labels on the chart. theme() function has been used to move the title to the center.
 # Change line color and fill color
 ggplot(data, aes(x=EAOGPAC))+
   geom_histogram(color="darkblue", fill="lightblue")
+
 ```
 
 # Regression
 
 ```{r}
 
-ols = lm(EAOGPAC ~ w1_phi_attr + w1_per_attr + BIO_SEX, data=data[!is.na(data$EAOGPAC), ])
+ols = lm(w5_bmi ~ w1_bmi + BIO_SEX, data=data)
 
 stargazer(ols, type='text')
 ```
