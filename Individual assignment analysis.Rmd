@@ -6,7 +6,7 @@ date: "2024-06-16"
 
 # Introduction
 
-Based on the article [Beautiful inside and out: Peer characteristics and academic performance](https://www.sciencedirect.com/science/article/pii/S0167268123004316?via%3Dihub), we propose a similar study where we investigate the relantionship between attractiveness  in adolescence and substance abuse later on. For that, we ustilize data from waves 1 and 3. 
+Based on the article [Beautiful inside and out: Peer characteristics and academic performance](https://www.sciencedirect.com/science/article/pii/S0167268123004316?via%3Dihub), we propose a similar study where we investigate the relationship between attractiveness in adolescence and substance abuse later on. For that, we utilize data from waves 1 and 3.
 
 In this file, we will focus on the code and statistical methods to produce the anaysis. This is also available in the remote repo: [git repo here](https://github.com/Bernardo-giff/health_care_analytics_final)
 
@@ -22,10 +22,9 @@ library(ggplot2)
 
 ```
 
+# Importing data
 
-### Loading the data for the first wave
-
-In the table below we can see the the 
+In the table below we can see the the
 
 ![Diagram of the study's structure.](./images/study_diagram.png)
 
@@ -72,7 +71,6 @@ rm(w3_data)
 
 ```
 
-
 For simplicity, we will also rename the variables that will be used in the regression
 
 ```{r}
@@ -81,33 +79,14 @@ data <- data %>%
   rename(
     w1_phi_attr = H1IR1,
     w1_per_attr = H1IR2,
+    w1_phi_mat = H1IR5,
     w1_groom = H1IR3,
-    w3_used_drugs = H3TO117,
   )
 ```
 
-```{r}
-# Define columns to keep
+# Data cleaning and EDA
 
-data$w3_used_drugs <- as.character(data$w3_used_drugs)
-
-# Extract the second number in parentheses
-data$w3_used_drugs_bin <- as.numeric(str_match(data$w3_used_drugs, "\\((\\d+)\\)\\s*\\((\\d+)\\)")[, 3])
-
-# Remove rows with NA in the drug response
-data <- data[!is.na(data$w3_used_drugs_bin), ]
-```
-
-```{r}
-
-data$H3TO38 <- as.character(data$H3TO38)
-
-# Extract the second number in parentheses
-data$w3_alc_freq <- as.numeric(str_match(data$H3TO38, "\\((\\d+)\\)\\s*\\((\\d+)\\)")[, 3])
-
-# Filter out responses without alcohol
-data <- data[!is.na(data$w3_alc_freq), ]
-```
+# Regression
 
 ```{r}
 
@@ -118,10 +97,10 @@ stargazer(ols, type='text')
 
 Similar to the approach of the article, we try to simplify the attractiveness variable to a binary variable:
 
-1 if scored attractive or very attractive.
-0 otherwise
+1 if scored attractive or very attractive. 0 otherwise
 
 Hence:
+
 ```{r}
 
 # Convert data to character
@@ -140,101 +119,29 @@ data$w1_phi_attr <- as.numeric(str_match(data$w1_phi_attr, "\\((\\d+)\\)\\s*\\((
 
 data$w1_phi_attr_new <- ifelse(data$w1_phi_attr %in% c(5, 6), 1, 0)
 
-```
+# Convert data to character
+data$w1_phi_mat <- as.character(data$w1_phi_mat)
 
-```{r}
+# Extract the second number in parentheses
+data$w1_phi_mat <- as.numeric(str_match(data$w1_phi_mat, "\\((\\d+)\\)\\s*\\((\\d+)\\)")[, 3])
+
+data$w1_phi_mat_new <- ifelse(data$w1_phi_mat %in% c(5, 6), 1, 0)
+
+# Conver bio sex data to binary
 data$male <- ifelse(data$BIO_SEX == '(1) (1) Male',1,0)
 
-data$male
 ```
 
 ```{r}
 
 data$log_EAOGPAC <- log(data$EAOGPAC)
 
-ols = lm(log_EAOGPAC ~ w1_phi_attr_new*male + w1_per_attr_new*male, data=data[!is.na(data$EAOGPAC) & !apply(data, 1, function(row) any(is.infinite(row))), ])
+ols = lm(EAOGPAC ~ w1_phi_attr_new*male + w1_per_attr_new*male + w1_phi_mat_new, data=data[!is.na(data$EAOGPAC), ])
 
 stargazer(ols, type='text')
 ```
 
-
 **Classes of interest**
-
-```{r}
-# create a character vector that will be used to
-# limit the first wave consolidated file
-# to only the variables needed
-w1.KeepVars <- c(
-  'H1GH59A'  # What is your height in feet and inches? (Feet in wave 1)
-  
-  , 'H1GH59B' # What is your height in feet and inches? (Inches in wave 1)
-  
-  , 'AID' # Unique identifier
-  
-  , 'H1GH51' # How many hours of sleep do you usually get?
-  
-  , 'BIO_SEX' # Reported sex at birth
-  
-  , 'SCH_YR' # 
-  
-  , 'H1GI1Y' # What is your birth date
-  
-  , 'IYEAR' # Year of the study
-  
-  , 'H1GH60' # What is your weight? (in pounds)
-  
-  , 'H1IR1' # How phisically attractive is the respondent
-  
-  , 'H1IR2' # How attractive is the respondent's personality?
-
-  , 'H1IR3' # How well-groomed is the respondent?
-  
-  , 'H1IR5' # How physically mature was the respondent compared with other adolescents of {HIS/HER} age?
-
-)
-
-# Select specific columns by names
-w1_data <- 
-  w1_data %>% select(w1.KeepVars)
-# View the selected data
-head(w1_data)
-
-```
-```{r}
-# Load library
-library(stringr)
-
-# Extract birth year from the year column
-w1_data$birth_year <- as.numeric(str_match(w1_data$H1GI1Y, "\\(\\d+\\)\\s*\\(\\d+\\)\\s*(\\d{4})")[, 2])
-
-# Calculate respondent's age at the time of the study
-w1_data$age <- 1995 - w1_data$birth_year
-
-```
-
-
-```{r}
-w3.KeepVars <- c(
-  'AID' # Unique ID
-  
-  , 'H3TO117' # Since June 1995, have you used any other types of illegal drugs, such as LSD, PCP, ecstasy, mushrooms, inhalants,                 #  ice, heroin, or prescription medicines not prescribed for you?
-)
-```
-
-```{r}
-w3_data <- 
-  w3_data %>% select(w3.KeepVars
-w3_data
-```
-```{r}
-# Merging data frames based on AID
-merged_df <- merge(w1_data, w3_data, by = "AID")
-```
-
-```{r}
-
-```
-
 
 Cleaning up the data
 
@@ -255,9 +162,6 @@ w1_data <- w1_data[!is.na(w1_data$feet_value) & w1_data$feet_value >= 4 & w1_dat
 w1_data <- w1_data[!is.na(w1_data$inch_value) & w1_data$inch_value >= 0 & w1_data$inch_value <= 9, ]
 ```
 
-
-
-
 ```{r}
 
 # Convert feet to centimeters (1 foot = 30.48 cm)
@@ -272,16 +176,11 @@ w1_data$height_cm <- w1_data$feet_value_cm + w1_data$inch_value_cm
 w1_data %>% select(c(H1GH59A, H1GH59B, feet_value_cm, inch_value_cm, height_cm))
 ```
 
-
-
 ### Finding patterns across generations
- Show the distribution of the sleep data
+
+Show the distribution of the sleep data
 
 ```{r}
-
-
-
-
 # For creating chart, we need to use ggplot() function and provide input data for each axes. Then we use geom_bar() function to apply bar chart specifications and labs() function to put labels on the chart. theme() function has been used to move the title to the center.
 # Change line color and fill color
 ggplot(w1_data, aes(x=H1GH51))+
@@ -297,7 +196,6 @@ ggplot(w1_data, aes(x=height_cm))+
 
 ```
 
-	
 Investigate weight distribution
 
 ```{r}
@@ -321,6 +219,7 @@ ggplot(w1_data, aes(x=bmi))+
 
 
 ```
+
 ```{r}
 ols <- lm(bmi ~ H1GH51, data=w1_data)
 
@@ -328,18 +227,7 @@ library(stargazer)
 
 stargazer(ols, type='text')
 ```
+
 At a firts glance, it seems that bmi and ours of sleep are highly correlated. However, we must continue the investigation as several other cofounding factors can be at play here. First, we will see what is the effect of age in this, as we know age is an important factor in sleep
 
-```{r}
-ols <- lm(bmi ~ H1GH51 + age, data=w1_data)
-
-library(stargazer)
-
-
-stargazer(ols, type='text')
-
-```
-
 Age already plays a significant role in the regression.
-
-
