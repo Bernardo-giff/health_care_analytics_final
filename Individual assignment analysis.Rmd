@@ -21,6 +21,8 @@ library(stargazer)
 library(stringr)
 library(ggplot2)
 library(UpSetR)
+library(naniar)
+library(tidyr)
 
 ```
 
@@ -91,6 +93,12 @@ data <- data %>%
 After selecting the variables of interest based on our assumptions, we start investigating for the quality and making decision about to keep. Firstly, we investigate missing values in the dependent variables that will used for the study.
 
 ```{r}
+value_counts <- table(data$w1_phi_mat)
+
+value_counts
+```
+
+```{r}
 data_candidates <- data %>%
   select(
     # Independent variables
@@ -98,18 +106,44 @@ data_candidates <- data %>%
     , w1_per_attr
     , w1_phi_mat
     , w1_groom
+    , BIO_SEX
     # Dependent variable
     , EAOGPAC
   )
-library(UpSetR)
-gg_miss_upset(data_candidates)
 
+vis_miss(data_candidates)
+
+
+```
+
+Using the gg_miss plot from the naniar package, we check the intersections of the missing variables.
+
+```{r}
+# Plotting the intersection between missing values
+gg_miss_upset(data_candidates)
+```
+
+We realize there is no relevant amount of data missing nor a clear interaction or pattern in that. Therefore, we can safely drop the missing values.
+
+```{r}
+data <-data %>%
+  select(
+    # Independent variables
+    w1_phi_attr,
+    w1_per_attr,
+    w1_phi_mat,
+    w1_groom,
+    BIO_SEX,
+    # Dependent variable
+    EAOGPAC
+  ) %>%
+  drop_na()
 ```
 
 ```{r}
 # For creating chart, we need to use ggplot() function and provide input data for each axes. Then we use geom_bar() function to apply bar chart specifications and labs() function to put labels on the chart. theme() function has been used to move the title to the center.
 # Change line color and fill color
-ggplot(w1_data, aes(x=H1GH51))+
+ggplot(data, aes(x=EAOGPAC))+
   geom_histogram(color="darkblue", fill="lightblue")
 ```
 
