@@ -64,13 +64,13 @@ data = merge(data, w5_data, by = "AID")
 
 # Data cleaning and EDA
 
-After selecting the variables of interest based on our assumptions, we start investigating for the quality and making decision about to keep. Firstly, we investigate missing values in the dependent variables that will used for the study.
+After selecting the variables of interest based on our assumptions, we start investigating for the quality and making decisions about which ones to keep. Firstly, we investigate missing values in the dependent variables that will used for the study.
 
 ```{r}
 # 
 data <- data %>%
   select(   
-    H5ID3              # Weight in pounds (wave 5)
+    H5ID3                # Weight in pounds (wave 5)
     , H5ID2F             # Height in feet (wave 5)
     , H5ID2I             # Height in inches (wave 5)
     , AID                # Respondent Identifier
@@ -83,7 +83,7 @@ data <- data %>%
     , H1WP8              # Dinner with Parents - Wave I
     , H1GH34             # Ate Vegetables Yesterday - Wave I
     , H1WP7              # Make Own Decisions About Diet - Wave I
-    # What do you usually have for breakfast on a weekday morning?
+    # Start of "What do you usually have for breakfast on a weekday morning?" block
     , H1GH23A            # Milk
     , H1GH23B            # coffee or tea
     , H1GH23C            # cereal
@@ -94,21 +94,18 @@ data <- data %>%
     , H1GH23H            # bread toast or rolls
     , H1GH23I            # other items
     , H1GH23J            # Nothing
-    # End of "What do you usually have for breakfast on a weekday morning?" blcok
+    # End of "What do you usually have for breakfast on a weekday morning?" block
     , H1GH1              # General Health - Wave I
     , H1GH51             # Sleep - Wave I
-    , H1FS6              # Felt Depressed - Wave I
     , H1TS4              # Learned Problems of Obesity - Wave I
     , H1TS1              # Learned Proper Diet - Wave I
     , PA55               # Total Household Income 1994
     , BST90P02           # Modal Race (Wave 1 context)
-    , BST90P08           # Modal Marital Status (Wave 1 context)
     , BST90P01           # Urbanicity Code (Wave 1 context)
   )
-
-
-
 ```
+
+We quickly glance at the profile of missing data for this sample. We see that aside from the income (in wave 1) and exercise information (in wave 5), we do not have a significant issue with missing data. We will tackle that later on.
 
 ```{r}
 # Plotting missing data density
@@ -116,14 +113,12 @@ vis_miss(data)
 
 ```
 
+The following plot shows the size of the intersection of missing data between variables. We also don't observe very significant patterns of joint occurrence.
+
 ```{r}
 # Plotting the intersection between missing values
 gg_miss_upset(data)
 ```
-
-Besides the exercise and total household income variables, we see that there are few missing values for all of the other variables.
-
-We realize there is no relevant amount of data missing nor a clear interaction or pattern in that. Therefore, we can safely drop the missing values.
 
 Next we need to transform the height and weight variables to the metric system. Both our independent and dependent variables rely on it.
 
@@ -146,7 +141,7 @@ data <- data %>%
     w1_weight_kg = H1GH60 * 0.453592,
     
     # Calculate bmi in weight 1
-    w1_bmi = w1_weight_kg / ((w1_height_cm/100) ^ 2),
+    w1_bmi = w1_weight_kg / (w1_height_cm ^ 2),
     
     # Convert height of Wave 5 to numeric
     w5_height_feet = as.numeric(sub(".*\\) (\\d+).*", "\\1", as.character(H5ID2F))),
@@ -162,10 +157,10 @@ data <- data %>%
     w5_weight_kg = H5ID3 * 0.453592,
     
     # Calculate bmi in weight 5
-    w5_bmi = w5_weight_kg / ((w5_height_cm/100) ^ 2)
+    w5_bmi = w5_weight_kg / (w5_height_cm ^ 2)
     
   )  %>%
-  # Drop auxiliary columns created
+  # Drop auxiliary columns created and old columns
   select(
     -w1_height_feet
     , -w1_height_inches
@@ -186,9 +181,16 @@ data <- data %>%
     )
 ```
 
+We quickly inspect the amount of missing data in these variables
+
 ```{r}
-data
+vis_miss(data %>% select(w5_bmi, w1_bmi))
+
 ```
+
+Since the total amount of missing variables is only 3% for the first wave, we should drop them, since the hypothesis we are testing relies on this information and the proportion is small.
+
+Next, we start recasting the columns data to factors, cleaning up some of the options and casting the responses that we can't do anything with as NAs
 
 ```{r}
 
@@ -226,7 +228,7 @@ data <- data %>%
                              , "Multiple response")),
     
     # Convert multiple response to NA
-    , w5_exercise = replace(S63, S63 == "Multiple response", NA)
+    , w5_exercise = replace(w5_exercise, w5_exercise == "Multiple response", NA)
     
     # Convert Days_Having_Dinner_with_Parents to numeric, handle missing values
     , w1_dinner_with_parents = as.numeric(sub(".*\\) (\\d+).*", "\\1", 
@@ -324,76 +326,447 @@ data <- data %>%
     , w1_usual_breakfast_coffee = replace(w1_usual_breakfast_coffee, 
                               w1_usual_breakfast_coffee %in% c("Refused", "Don't know"), NA)
     
+    # Convert usual breakfast data
+    , w1_usual_breakfast_cereal = factor(H1GH23C, 
+                             levels = 
+                               c("(0) (0) Not marked"
+                                 , "(1) (1) Marked"
+                                 , "(6) (6) Refused"
+                                 , "(8) (8) Don't know"),
+                              labels = 
+                               c("No"
+                                 , "Yes"
+                                 , "Refused"
+                                 , "Don't know"))
+    # Coalesce NAs
+    , w1_usual_breakfast_cereal = replace(w1_usual_breakfast_cereal, 
+                              w1_usual_breakfast_cereal %in% c("Refused", "Don't know"), NA)
+    
+    # Convert usual breakfast data
+    , w1_usual_breakfast_fruit = factor(H1GH23D, 
+                             levels = 
+                               c("(0) (0) Not marked"
+                                 , "(1) (1) Marked"
+                                 , "(6) (6) Refused"
+                                 , "(8) (8) Don't know"),
+                              labels = 
+                               c("No"
+                                 , "Yes"
+                                 , "Refused"
+                                 , "Don't know"))
+    # Coalesce NAs
+    , w1_usual_breakfast_fruit = replace(w1_usual_breakfast_fruit, 
+                              w1_usual_breakfast_fruit %in% c("Refused", "Don't know"), NA)
+    
+    # Convert usual breakfast data
+    , w1_usual_breakfast_eggs = factor(H1GH23E, 
+                             levels = 
+                               c("(0) (0) Not marked"
+                                 , "(1) (1) Marked"
+                                 , "(6) (6) Refused"
+                                 , "(8) (8) Don't know"),
+                              labels = 
+                               c("No"
+                                 , "Yes"
+                                 , "Refused"
+                                 , "Don't know"))
+    # Coalesce NAs
+    , w1_usual_breakfast_eggs = replace(w1_usual_breakfast_eggs, 
+                              w1_usual_breakfast_eggs %in% c("Refused", "Don't know"), NA)
+    
+    # Convert usual breakfast data
+    , w1_usual_breakfast_meat = factor(H1GH23F, 
+                             levels = 
+                               c("(0) (0) Not marked"
+                                 , "(1) (1) Marked"
+                                 , "(6) (6) Refused"
+                                 , "(8) (8) Don't know"),
+                              labels = 
+                               c("No"
+                                 , "Yes"
+                                 , "Refused"
+                                 , "Don't know"))
+    # Coalesce NAs
+    , w1_usual_breakfast_meat = replace(w1_usual_breakfast_meat, 
+                              w1_usual_breakfast_meat %in% c("Refused", "Don't know"), NA)
+    
+    # Convert usual breakfast data
+    , w1_usual_breakfast_snack = factor(H1GH23G, 
+                             levels = 
+                               c("(0) (0) Not marked"
+                                 , "(1) (1) Marked"
+                                 , "(6) (6) Refused"
+                                 , "(8) (8) Don't know"),
+                              labels = 
+                               c("No"
+                                 , "Yes"
+                                 , "Refused"
+                                 , "Don't know"))
+    # Coalesce NAs
+    , w1_usual_breakfast_snack = replace(w1_usual_breakfast_snack, 
+                              w1_usual_breakfast_snack %in% c("Refused", "Don't know"), NA)
+    
+    # Convert usual breakfast data
+    , w1_usual_breakfast_bread = factor(H1GH23H, 
+                             levels = 
+                               c("(0) (0) Not marked"
+                                 , "(1) (1) Marked"
+                                 , "(6) (6) Refused"
+                                 , "(8) (8) Don't know"),
+                              labels = 
+                               c("No"
+                                 , "Yes"
+                                 , "Refused"
+                                 , "Don't know"))
+    # Coalesce NAs
+    , w1_usual_breakfast_bread = replace(w1_usual_breakfast_bread, 
+                              w1_usual_breakfast_bread %in% c("Refused", "Don't know"), NA)
+    
+    
+    # Convert Race to factors, handle missing values
+    , w1_ethnicity = factor(BST90P02, 
+                            levels = 
+                              c("(1) (1) White"
+                                , "(2) (2) Black"
+                                , "(3) (3) Other"
+                                , "(8) (8) Unstable estimates"
+                                , "(9) (9) Geocode missing"),
+                            labels = 
+                              c("White"
+                                , "Black"
+                                , "Other"
+                                , "Unstable estimates"
+                                , "Geocode missing"))
+    
+    # Coalesce NAs
+    , w1_ethnicity = replace(w1_ethnicity, w1_ethnicity %in% 
+                               c("Unstable estimates", "Geocode missing"), NA),
+    
+        # Convert Urban to factors, handle missing values
+    , w1_urbanity = factor(BST90P01, 
+                           levels = c("(1) (1) Completely urban"
+                                      , "(2) (2) Not completely urban"
+                                      , "(8) (8) Unstable estimates"
+                                      , "(9) (9) Geocode missing"),
+                           labels = c("Completely urban"
+                                      , "Not completely urban"
+                                      , "Unstable estimates"
+                                      , "Geocode missing")),
+    , w1_urbanity = replace(w1_urbanity, w1_urbanity %in% c("Unstable estimates", "Geocode missing"), NA),
     
     , w1_income_1994 = PA55 * 1000
+    ) %>%
+    # Remove old columns
+    select(
+        -AID                # Respondent Identifier
+        , -S63                # Exercise - Wave I
+        , -H1WP8              # Dinner with Parents - Wave I
+        , -H1GH34             # Ate Vegetables Yesterday - Wave I
+        , -H1WP7              # Make Own Decisions About Diet - Wave I
+        # What do you usually have for breakfast on a weekday morning?
+        , -H1GH23A            # Milk
+        , -H1GH23B            # coffee or tea
+        , -H1GH23C            # cereal
+        , -H1GH23D            # fruit, juice
+        , -H1GH23E            # eggs
+        , -H1GH23F            # meat
+        , -H1GH23G            # snack food
+        , -H1GH23H            # bread toast or rolls
+        , -H1GH23I            # other items
+        , -H1GH23J            # Nothing
+        # End of "What do you usually have for breakfast on a weekday morning?" blcok
+        , -H1GH1              # General Health - Wave I
+        , -H1GH51             # Sleep - Wave I
+        , -H1TS4              # Learned Problems of Obesity - Wave I
+        , -H1TS1              # Learned Proper Diet - Wave I
+        , -PA55               # Total Household Income 1994
+        , -BST90P02           # Modal Race (Wave 1 context)
+        , -BST90P01           # Urbanicity Code (Wave 1 context)
     )
 ```
 
 ```{r}
-data
+vis_miss(data)
 ```
 
 We proceed by investigating the distributions of the variables chosen for analyses to lay out our hypotheses.
 
-```{r}
-# For creating chart, we need to use ggplot() function and provide input data for each axes. Then we use geom_bar() function to apply bar chart specifications and labs() function to put labels on the chart. theme() function has been used to move the title to the center.
-# Change line color and fill color
-ggplot(data, aes(x=EAOGPAC))+
-  geom_histogram(color="darkblue", fill="lightblue")
+## Gender
 
+Firstly, we look at gender. We see that that are more women in the sample than men.
+
+```{r}
+
+# Plot bar plot for 'Sex' variable
+# Calculate proportions
+data_prop <- data %>%
+  group_by(BIO_SEX) %>%
+  summarise(count = n()) %>%
+  mutate(proportion = count / sum(count))
+
+# Plot bar plot for 'Sex' variable showing proportions
+ggplot(data_prop, aes(x = BIO_SEX, y = proportion, fill = BIO_SEX)) +
+  geom_bar(stat = "identity") +
+  labs(title = "Proportion of Biological Sex", x = "Bio sex", y = "Proportion") +
+  scale_y_continuous(labels = scales::percent_format()) +
+  theme_minimal()
+
+```
+
+We will not reweigh these variables, and simply discuss this in the limitations of this study.
+
+## Exercise (wave 5)
+
+```{r}
+# Check for NAs in the 'Exercise' variable
+num_na_exercise <- sum(is.na(data$w5_exercise))
+
+# Plot bar plot for 'Exercise' variable
+ggplot(data, aes(x = w5_exercise)) +
+  geom_bar() +
+  labs(title = "Distribution of Exercise", x = "Exercise Frequency", y = "Count") +
+  theme_minimal()
+
+```
+
+In the case of exercise, we see that we have a lot of missing variables. There are several approaches we could take here. We cannot really drop these observations as they are a large proportion of the entire dataset. We will instead imput the mode.
+
+```{r}
+# Find the mode for Exercise
+mode_exercise <- names(sort(table(data$w5_exercise), decreasing = TRUE))[1]
+
+# Impute missing values in Exercise with the mode
+data$w5_exercise[is.na(data$w5_exercise)] <- mode_exercise
+
+# Convert Exercise back to factor to maintain the original categories
+data$w5_exercise <- factor(data$w5_exercise, 
+                           levels = 
+                             c("Never"
+                               , "1 or 2 times"
+                               , "3 to 5 times"
+                               , "6 or 7 times"
+                               , "More than 7 times"))
+
+# Plot the distribution of Exercise after imputing NAs
+ggplot(data, aes(x = w5_exercise)) +
+  geom_bar(fill = "skyblue", color = "black") +
+  labs(title = "Distribution of Exercise (After Imputing NAs)", x = "Exercise Frequency", y = "Count") +
+  theme_minimal()
+
+```
+
+## Dinner with parents (wave 1)
+
+```{r}
+# Plot distribution for Days_Having_Dinner_with_Parents
+ggplot(data, aes(x = w1_dinner_with_parents)) +
+  geom_bar(fill = "skyblue", color = "black") +
+  labs(title = "Distribution of Days Having Dinner with Parents", x = "Days Having Dinner with Parents", y = "Count")
+
+# Check the number of NAs in Days_Having_Dinner_with_Parents
+table(is.na(data$w1_dinner_with_parents))
+```
+
+We see that most children of the study have dinner with their parents every day. We therefore will also attempt to simplify this variable for testing for children that have dinner with their parents everyday versus those who don't
+
+```{r}
+data$w1_dinner_everyday <- ifelse(data$w1_dinner_with_parents == 7,1,0)
+
+# Plot the distribution of Exercise after imputing NAs
+ggplot(data, aes(x = w1_dinner_everyday)) +
+  geom_bar(fill = "skyblue", color = "black") +
+  labs(title = "Dinner everyday", x = "Dinner everyday", y = "Count") +
+  theme_minimal()
+
+```
+
+## Household income
+
+```{r}
+# Summary statistics for Total_Household_Income_1994
+summary(data$w1_income_1994)
+
+# Check for missing values
+sum(is.na(data$w1_income_1994))
+
+# Histogram for Total_Household_Income_1994
+ggplot(data, aes(x = w1_income_1994)) +
+  geom_histogram(binwidth = 5000, fill = "skyblue", color = "black") +
+  labs(title = "Distribution of Total Household Income (1994)", x = "Total Household Income (in dollars)", y = "Count") +
+  theme_minimal()
+
+# Boxplot for Total_Household_Income_1994
+ggplot(data, aes(x = w1_income_1994)) +
+  geom_boxplot(fill = "skyblue", color = "black") +
+  labs(title = "Boxplot of Total Household Income (1994)", x = "Total Household Income (in dollars)") +
+  theme_minimal()
+
+```
+
+Imputing NAs with the mean and looking at log of total income and examine the distribution.
+
+```{r}
+# Get mean value of income
+mean_income <- mean(data$w1_income_1994, na.rm = TRUE)
+
+# Imput missing values with the mean
+data <- data %>%
+  mutate(w1_income_1994 = ifelse(is.na(w1_income_1994), mean_income, w1_income_1994))
+
+# Get the log of household from the new imputed income
+data <- data %>%
+  mutate(w1_income_1994_log = log10(w1_income_1994))
+
+# Plot the distribution of the log-transformed income
+ggplot(data, aes(x = w1_income_1994_log)) +
+  geom_histogram(binwidth = 0.1, fill = "skyblue", color = "black") +
+  labs(title = "Distribution of Log-Transformed Total Household Income (1994)", x = "Log10(Total Household Income 1994)", y = "Count") +
+  theme_minimal()
+
+# Summary statistics for the log-transformed Total_Household_Income_1994
+summary(data$w1_income_1994_log)
+# Boxplot for the log-transformed Total Household Income (1994)
+ggplot(data, aes(y = w1_income_1994_log)) +
+  geom_boxplot(fill = "skyblue", color = "black") +
+  labs(title = "Boxplot of Log-Transformed Total Household Income (1994)", y = "Log10(Total Household Income 1994)") +
+  theme_minimal()
+```
+
+Lastly, we handle the outliers of the income variable
+
+```{r}
+# Winsorizing function
+winsorize <- function(x, lower_quantile = 0.01, upper_quantile = 0.99) {
+  lower_bound <- quantile(x, lower_quantile, na.rm = TRUE)
+  upper_bound <- quantile(x, upper_quantile, na.rm = TRUE)
+  x[x < lower_bound] <- lower_bound
+  x[x > upper_bound] <- upper_bound
+  return(x)
+}
+
+# Apply Winsorizing to the log-transformed total household income
+data <- data %>%
+  mutate(w1_income_1994_log_win = winsorize(w1_income_1994_log))
+
+# Plot the distribution of the winsorized log-transformed total household income
+ggplot(data, aes(x = w1_income_1994_log_win)) +
+  geom_histogram(binwidth = 0.1, fill = "skyblue", color = "black") +
+  labs(title = "Distribution of Winsorized Log-Transformed Total Household Income (1994)", x = "Winsorized Log10(Total Household Income 1994)", y = "Count") +
+  theme_minimal()
+
+# Boxplot for the winsorized log-transformed total household income
+ggplot(data, aes(y = w1_income_1994_log_win)) +
+  geom_boxplot(fill = "skyblue", color = "black") +
+  labs(title = "Boxplot of Winsorized Log-Transformed Total Household Income (1994)", y = "Winsorized Log10(Total Household Income 1994)") +
+  theme_minimal()
+
+# Summary statistics for the winsorized log-transformed total household income
+summary(data$w1_income_1994_log_win)
 ```
 
 # Regression
 
+We start understanding the relantionship between our variables. We devide the independent variables in four groups:
+
+1.  Wave 1 background
+2.  Wave 1 baseline health indicators
+3.  Wave 1 dieting educational factors
+4.  Wave 5 habits
+
+We start with a simple regression on the selected variables
+
 ```{r}
+ols1 = lm(w5_bmi ~  
+                  # Wave 5 habits
+                  + w5_exercise
+                  # Wave 1 background
+                  + BIO_SEX
+                  + w1_ethnicity
+                  + w1_urbanity
+                  + w1_income_1994_log_win
+                  # Wave 1 baseline health indicators
+                  + w1_bmi
+                  + w1_general_health
+                  # Dieting educational factors
+                  + w1_learned_diet
+                  + w1_dinner_with_parents
+                  + w1_learned_problems_obesity
+                  + w1_usual_breakfast_cereal
+                  + w1_usual_breakfast_fruit
+                  + w1_usual_breakfast_eggs
+                  + w1_usual_breakfast_meat
+                  + w1_usual_breakfast_snack
+                  + w1_usual_breakfast_bread
+         , data=data)
 
-ols = lm(w5_bmi ~ w1_bmi + BIO_SEX, data=data)
-
-stargazer(ols, type='text')
+stargazer(ols1, type='text')
 ```
 
-Similar to the approach of the article, we try to simplify the attractiveness variable to a binary variable:
-
-1 if scored attractive or very attractive. 0 otherwise
-
-Hence:
+## Panel 1: Children that were not overweight and became overweight
 
 ```{r}
+# Get only children that transitioned from not overweight to overweight
+data_panel_1 <- data[(data$w1_bmi < 25) & (data$w5_bmi > 30),]
 
-# Convert data to character
-data$w1_per_attr <- as.character(data$w1_per_attr)
+ols2 = lm(w5_bmi ~  
+                  # Wave 5 habits
+                  + w5_exercise
+                  # Wave 1 background
+                  + BIO_SEX
+                  + w1_ethnicity
+                  + w1_urbanity
+                  + w1_income_1994_log_win
+                  # Wave 1 baseline health indicators
+                  + w1_bmi
+                  + w1_general_health
+                  # Dieting educational factors
+                  + w1_learned_diet
+                  + w1_dinner_with_parents
+                  + w1_learned_problems_obesity
+                  + w1_usual_breakfast_cereal
+                  + w1_usual_breakfast_fruit
+                  + w1_usual_breakfast_eggs
+                  + w1_usual_breakfast_meat
+                  + w1_usual_breakfast_snack
+                  + w1_usual_breakfast_bread
+         , data=data_panel_1)
 
-# Extract the second number in parentheses
-data$w1_per_attr <- as.numeric(str_match(data$w1_per_attr, "\\((\\d+)\\)\\s*\\((\\d+)\\)")[, 3])
+stargazer(ols1, type='text')
+```
 
-data$w1_per_attr_new <- ifelse(data$w1_per_attr %in% c(5, 6), 1, 0)
+```{r}
+data$w5_become_overweight <- ifelse(data$w1_bmi < 25 & data$w5_bmi > 30, 1, 0)
 
-# Convert data to character
-data$w1_phi_attr <- as.character(data$w1_phi_attr)
-
-# Extract the second number in parentheses
-data$w1_phi_attr <- as.numeric(str_match(data$w1_phi_attr, "\\((\\d+)\\)\\s*\\((\\d+)\\)")[, 3])
-
-data$w1_phi_attr_new <- ifelse(data$w1_phi_attr %in% c(5, 6), 1, 0)
-
-# Convert data to character
-data$w1_phi_mat <- as.character(data$w1_phi_mat)
-
-# Extract the second number in parentheses
-data$w1_phi_mat <- as.numeric(str_match(data$w1_phi_mat, "\\((\\d+)\\)\\s*\\((\\d+)\\)")[, 3])
-
-data$w1_phi_mat_new <- ifelse(data$w1_phi_mat %in% c(5, 6), 1, 0)
-
-# Conver bio sex data to binary
-data$male <- ifelse(data$BIO_SEX == '(1) (1) Male',1,0)
+# Check the distribution again
+ggplot(data, aes(x = w5_become_overweight)) +
+  geom_bar(fill = "skyblue", color = "black") +
+  labs(title = "Distribution of Urban (Cleaned)", x = "Become overweight", y = "Count") +
+  theme_minimal()
 
 ```
 
 ```{r}
+logit = glm(w5_become_overweight ~  
+                  # Wave 1 background
+                  + BIO_SEX
+                  + w1_ethnicity
+                  + w1_urbanity
+                  + w1_income_1994_log_win
+                  # Wave 1 baseline health indicators
+                  + w1_bmi
+                  + w1_general_health
+                  # Dieting educational factors
+                  + w1_learned_diet
+                  + w1_dinner_with_parents
+                  + w1_learned_problems_obesity
+                  + w1_usual_breakfast_cereal
+                  + w1_usual_breakfast_fruit
+                  + w1_usual_breakfast_eggs
+                  + w1_usual_breakfast_meat
+                  + w1_usual_breakfast_snack
+                  + w1_usual_breakfast_bread
+            , family = 'binomial'
+         , data=data)
 
-data$log_EAOGPAC <- log(data$EAOGPAC)
-
-ols = lm(EAOGPAC ~ w1_phi_attr_new*male + w1_per_attr_new*male + w1_phi_mat_new, data=data[!is.na(data$EAOGPAC), ])
-
-stargazer(ols, type='text')
+stargazer(logit, type='text')
 ```
