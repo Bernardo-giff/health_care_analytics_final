@@ -7,8 +7,6 @@ date: "2024-06-16"
 
 # Introduction
 
-Based on the article [Beautiful inside and out: Peer characteristics and academic performance](https://www.sciencedirect.com/science/article/pii/S0167268123004316?via%3Dihub), we propose a similar study where we investigate the relationship between attractiveness in adolescence and substance abuse later on. For that, we utilize data from waves 1 and 3.
-
 In this file, we will focus on the code and statistical methods to produce the anaysis. This is also available in the remote repo: [git repo here](https://github.com/Bernardo-giff/health_care_analytics_final)
 
 ```{r}
@@ -911,6 +909,28 @@ stargazer(ols3,
           title = "Panel 2: Children who did not transition")
 ```
 
+## Logit model: Baseline
+
+```{r}
+logit = glm(w5_become_overweight ~  
+                  # Wave 1 background
+                  + BIO_SEX
+                  + w1_ethnicity
+                  + w1_income_1994_log_win
+                  # Wave 1 baseline health indicators
+                  + w1_general_health_int
+                  # Dieting educational factors
+                  + w1_bmi
+            , family = 'binomial'
+         , data=data)
+
+stargazer(logit,
+          type="text",
+          single.row = TRUE,
+          header = FALSE,
+          title = "Logit regression - Become overweight")
+```
+
 ## Logit model: Explaining the transition
 
 ```{r}
@@ -933,26 +953,6 @@ logit = glm(w5_become_overweight ~
                   + w1_usual_breakfast_meat
                   + w1_usual_breakfast_snack
                   + w1_usual_breakfast_bread
-            , family = 'binomial'
-         , data=data)
-
-stargazer(logit,
-          type="text",
-          single.row = TRUE,
-          header = FALSE,
-          title = "Logit regression - Become overweight")
-```
-
-```{r}
-logit = glm(w5_become_overweight ~  
-                  # Wave 1 background
-                  + BIO_SEX
-                  + w1_ethnicity
-                  + w1_income_1994_log_win
-                  # Wave 1 baseline health indicators
-                  + w1_general_health_int
-                  # Dieting educational factors
-                  + w1_bmi
             , family = 'binomial'
          , data=data)
 
