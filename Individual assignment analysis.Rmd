@@ -99,6 +99,7 @@ data <- data %>%
     , H1GH51             # Sleep - Wave I
     , H1TS4              # Learned Problems of Obesity - Wave I
     , H1TS1              # Learned Proper Diet - Wave I
+    , H1TS2              # Learned about the importance of exercise - Wave I
     , PA55               # Total Household Income 1994
     , BST90P02           # Modal Race (Wave 1 context)
     , BST90P01           # Urbanicity Code (Wave 1 context)
@@ -261,7 +262,7 @@ data <- data %>%
     , w1_general_health = replace(w1_general_health
                                 , w1_general_health %in% c("Refused", "Don't know"), NA)
     
-    # Convert Learned_Problems_of_Obesity to factors, handle missing values
+    # Convert problems of obesity to factors, handle missing values
     , w1_learned_problems_obesity = factor(H1TS4, 
                                          levels = 
                                            c("(0) (0) No"
@@ -272,14 +273,31 @@ data <- data %>%
                                            c("No"
                                              , "Yes"
                                              , "Refused"
-                                             , "Don't know")),
+                                             , "Don't know"))
     # Coalesce NAs
-    w1_learned_problems_obesity = replace(w1_learned_problems_obesity, 
+    , w1_learned_problems_obesity = replace(w1_learned_problems_obesity, 
                                           w1_learned_problems_obesity %in% 
+                                            c("Refused", "Don't know"), NA)
+    
+    # Convert importance of exercise to factors, handle missing values
+    , w1_learned_importance_exercise = factor(H1TS2, 
+                                         levels = 
+                                           c("(0) (0) No"
+                                             , "(1) (1) Yes"
+                                             , "(6) (6) Refused"
+                                             , "(8) (8) Don't know"),
+                                         labels = 
+                                           c("No"
+                                             , "Yes"
+                                             , "Refused"
+                                             , "Don't know"))
+    # Coalesce NAs
+    , w1_learned_importance_exercise = replace(w1_learned_importance_exercise, 
+                                          w1_learned_importance_exercise %in% 
                                             c("Refused", "Don't know"), NA),
     
     # Convert Learned_Proper_Diet to factors, handle missing values
-    w1_learned_diet = factor(H1TS1, 
+    , w1_learned_diet = factor(H1TS1, 
                              levels = 
                                c("(0) (0) No"
                                  , "(1) (1) Yes"
@@ -479,6 +497,7 @@ data <- data %>%
         , -H1GH51             # Sleep - Wave I
         , -H1TS4              # Learned Problems of Obesity - Wave I
         , -H1TS1              # Learned Proper Diet - Wave I
+        , -H1TS2              # Learned importance of exercise - Wave I
         , -PA55               # Total Household Income 1994
         , -BST90P02           # Modal Race (Wave 1 context)
         , -BST90P01           # Urbanicity Code (Wave 1 context)
@@ -580,6 +599,39 @@ ggplot(data, aes(x = w1_dinner_everyday)) +
 
 ```
 
+## Education questions
+
+```{r}
+data_long <- data %>%
+  pivot_longer(cols = c(w1_learned_diet, 
+                        w1_learned_problems_obesity, 
+                        w1_learned_importance_exercise), 
+               names_to = "Question", 
+               values_to = "Response") %>%
+  drop_na(Response)
+
+data_long <- data_long %>%
+  mutate(Question = recode(Question,
+                           w1_learned_diet = "Learned About Diet",
+                           w1_learned_problems_obesity = "Learned About Problems of Obesity",
+                           w1_learned_importance_exercise = "Learned About Importance of Exercise"))
+
+# Calculate the proportion of each response within each question
+data_long_proportion <- data_long %>%
+  group_by(Question, Response) %>%
+  summarize(Count = n()) %>%
+  mutate(Proportion = Count / sum(Count))
+
+# Plot the data
+ggplot(data_long_proportion, aes(x = Response, y = Proportion, fill = Question)) +
+  geom_bar(stat = "identity", position = "dodge", color = "black") +
+  labs(title = "Distribution of Responses for Each Question",
+       x = "Response",
+       y = "Proportion") +
+  theme_minimal() +
+  scale_fill_brewer(palette = "Pastel1")
+```
+
 ## Household income
 
 ```{r}
@@ -600,7 +652,6 @@ ggplot(data, aes(x = w1_income_1994)) +
   geom_boxplot(fill = "skyblue", color = "black") +
   labs(title = "Boxplot of Total Household Income (1994)", x = "Total Household Income (in dollars)") +
   theme_minimal()
-
 ```
 
 Imputing NAs with the mean and looking at log of total income and examine the distribution.
@@ -664,9 +715,60 @@ ggplot(data, aes(y = w1_income_1994_log_win)) +
 summary(data$w1_income_1994_log_win)
 ```
 
+## Ethnicity
+
+```{r}
+# Plot the distribution of Race
+ggplot(data, aes(x = w1_ethnicity)) +
+  geom_bar(fill = "skyblue", color = "black") +
+  labs(title = "Distribution of Race", x = "Race", y = "Count") +
+  theme_minimal()
+
+# Summary statistics for Race
+summary_race <- summary(data$w1_ethnicity)
+print(summary_race)
+
+```
+
+```{r}
+# Remove NA, geocode missing, and unstable estimates from Race and drop the levels
+data <- data %>%
+  filter(!is.na(w1_ethnicity)) %>%
+  filter(w1_ethnicity != "(8) Unstable estimates" & w1_ethnicity != "(9) Geocode missing")
+
+# Drop unused factor levels
+data$w1_ethnicity <- droplevels(data$w1_ethnicity)
+
+# Plot the updated distribution of Race
+ggplot(data, aes(x = w1_ethnicity)) +
+  geom_bar(fill = "skyblue", color = "black") +
+  labs(title = "Distribution of Race", x = "Race", y = "Count") +
+  theme_minimal()
+
+# Summary statistics for Race after cleaning
+summary_race_cleaned <- summary(data$w1_ethnicity)
+print(summary_race_cleaned)
+```
+
+## General health
+
+```{r}
+# Reorder the levels of w1_general_health
+data$w1_general_health <- factor(data$w1_general_health, levels = c("Poor", "Fair", "Good", "Very good", "Excellent", NA))
+
+# Check the distribution again
+ggplot(data, aes(x = w1_general_health)) +
+  geom_bar(fill = "skyblue", color = "black") +
+  labs(title = "Distribution of General Health", x = "General Health", y = "Count") +
+  theme_minimal()
+
+# Summary statistics for General_Health
+summary(data$w1_general_health)
+```
+
 # Regression
 
-We start understanding the relantionship between our variables. We devide the independent variables in four groups:
+We start understanding the relationship between our variables. We the independent variables in four groups:
 
 1.  Wave 1 background
 2.  Wave 1 baseline health indicators
@@ -677,13 +779,11 @@ We start with a simple regression on the selected variables
 
 ```{r}
 ols1 = lm(w5_bmi ~  
-                  # Wave 5 habits
-                  + w5_exercise
                   # Wave 1 background
-                  + BIO_SEX
+                  + w1_income_1994_log_win
                   + w1_ethnicity
                   + w1_urbanity
-                  + w1_income_1994_log_win
+                  + BIO_SEX
                   # Wave 1 baseline health indicators
                   + w1_bmi
                   + w1_general_health
@@ -691,12 +791,15 @@ ols1 = lm(w5_bmi ~
                   + w1_learned_diet
                   + w1_dinner_with_parents
                   + w1_learned_problems_obesity
+                  + w1_learned_importance_exercise
                   + w1_usual_breakfast_cereal
                   + w1_usual_breakfast_fruit
                   + w1_usual_breakfast_eggs
                   + w1_usual_breakfast_meat
                   + w1_usual_breakfast_snack
                   + w1_usual_breakfast_bread
+                  # Wave 5 habits
+                  + w5_exercise
          , data=data)
 
 stargazer(ols1, type='text')
@@ -723,6 +826,7 @@ ols2 = lm(w5_bmi ~
                   + w1_learned_diet
                   + w1_dinner_with_parents
                   + w1_learned_problems_obesity
+                  + w1_learned_importance_exercise
                   + w1_usual_breakfast_cereal
                   + w1_usual_breakfast_fruit
                   + w1_usual_breakfast_eggs
@@ -731,7 +835,11 @@ ols2 = lm(w5_bmi ~
                   + w1_usual_breakfast_bread
          , data=data_panel_1)
 
-stargazer(ols1, type='text')
+stargazer(ols1,
+          type="text",
+          single.row = TRUE,
+          header = FALSE,
+          title = "Simple regression - No changes")
 ```
 
 ```{r}
