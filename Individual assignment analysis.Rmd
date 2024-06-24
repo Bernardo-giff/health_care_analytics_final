@@ -9,7 +9,7 @@ date: "2024-06-16"
 
 In this file, we will focus on the code and statistical methods to produce the anaysis. This is also available in the remote repo: [git repo here](https://github.com/Bernardo-giff/health_care_analytics_final)
 
-```{r}
+```{r, message=FALSE, warning=FALSE}
 # Set the working dir
 setwd('/Users/bernardocarvalho/Library/CloudStorage/OneDrive-ImperialCollegeLondon/2024/Health care analytics')
 
