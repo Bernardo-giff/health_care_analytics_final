@@ -1,6 +1,6 @@
 ---
 title: "Health care analytics individual assignment"
-subtitle: "The relantionship between attractivenss (phisical and personality) in academic achievement"
+subtitle: "The importance of early life dietary education and habits in long term BMI"
 output: html_document
 date: "2024-06-16"
 ---
@@ -766,6 +766,14 @@ ggplot(data, aes(x = w1_general_health)) +
 summary(data$w1_general_health)
 ```
 
+In order to improve the interpretation of the model, we change the health data from categorical to an integer variable.
+
+```{r}
+
+# Convert the factor to an integer variable
+data$w1_general_health_int <- as.integer(data$w1_general_health)
+```
+
 # Regression
 
 We start understanding the relationship between our variables. We the independent variables in four groups:
@@ -786,7 +794,7 @@ ols1 = lm(w5_bmi ~
                   + BIO_SEX
                   # Wave 1 baseline health indicators
                   + w1_bmi
-                  + w1_general_health
+                  + w1_general_health_int
                   # Dieting educational factors
                   + w1_learned_diet
                   + w1_dinner_with_parents
@@ -802,7 +810,11 @@ ols1 = lm(w5_bmi ~
                   + w5_exercise
          , data=data)
 
-stargazer(ols1, type='text')
+stargazer(ols1,
+          type="text",
+          single.row = TRUE,
+          header = FALSE,
+          title = "Simple regression - No changes")
 ```
 
 ## Panel 1: Children that were not overweight and became overweight
@@ -835,7 +847,7 @@ ols2 = lm(w5_bmi ~
                   + w1_usual_breakfast_bread
          , data=data_panel_1)
 
-stargazer(ols1,
+stargazer(ols2,
           type="text",
           single.row = TRUE,
           header = FALSE,
@@ -861,12 +873,12 @@ logit = glm(w5_become_overweight ~
                   + w1_urbanity
                   + w1_income_1994_log_win
                   # Wave 1 baseline health indicators
-                  + w1_bmi
-                  + w1_general_health
+                  + w1_general_health_int
                   # Dieting educational factors
                   + w1_learned_diet
-                  + w1_dinner_with_parents
+                  + w1_learned_importance_exercise
                   + w1_learned_problems_obesity
+                  + w1_dinner_with_parents
                   + w1_usual_breakfast_cereal
                   + w1_usual_breakfast_fruit
                   + w1_usual_breakfast_eggs
@@ -876,5 +888,9 @@ logit = glm(w5_become_overweight ~
             , family = 'binomial'
          , data=data)
 
-stargazer(logit, type='text')
+stargazer(logit,
+          type="text",
+          single.row = TRUE,
+          header = FALSE,
+          title = "Logit regression - Become overweight")
 ```
