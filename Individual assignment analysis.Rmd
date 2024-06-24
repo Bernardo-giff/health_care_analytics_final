@@ -817,7 +817,19 @@ stargazer(ols1,
           title = "Simple regression - No changes")
 ```
 
-## Panel 1: Children that were not overweight and became overweight
+We observe that the BMI level in wave 1 is still the second most relevant factor in explaining the BMI in wave 5. Therefore, we try a second approach: Paneling the data for children that were not overeight and became overweight. We define this transition as children who had a BMI of less than 25 in wave 1 and in wave 5 were over 30.
+
+```{r}
+data$w5_become_overweight <- ifelse(data$w1_bmi < 25 & data$w5_bmi > 30, 1, 0)
+
+# Check the distribution again
+ggplot(data, aes(x = w5_become_overweight)) +
+  geom_bar(fill = "skyblue", color = "black") +
+  labs(title = "Distribution of Urban (Cleaned)", x = "Become overweight", y = "Count") +
+  theme_minimal()
+```
+
+## Panel 1: Children who were not overweight and became overweight
 
 ```{r}
 # Get only children that transitioned from not overweight to overweight
@@ -833,7 +845,7 @@ ols2 = lm(w5_bmi ~
                   + w1_income_1994_log_win
                   # Wave 1 baseline health indicators
                   + w1_bmi
-                  + w1_general_health
+                  + w1_general_health_int
                   # Dieting educational factors
                   + w1_learned_diet
                   + w1_dinner_with_parents
@@ -851,19 +863,55 @@ stargazer(ols2,
           type="text",
           single.row = TRUE,
           header = FALSE,
-          title = "Simple regression - No changes")
+          title = "Panel 1: Children who were not overweight and became overweight")
 ```
 
 ```{r}
-data$w5_become_overweight <- ifelse(data$w1_bmi < 25 & data$w5_bmi > 30, 1, 0)
-
 # Check the distribution again
-ggplot(data, aes(x = w5_become_overweight)) +
+ggplot(data_panel_1 %>% na.omit(), aes(x = BIO_SEX)) +
   geom_bar(fill = "skyblue", color = "black") +
-  labs(title = "Distribution of Urban (Cleaned)", x = "Become overweight", y = "Count") +
+  labs(title = "Panel 2 distribution", x = "Become overweight", y = "Count") +
   theme_minimal()
-
 ```
+
+## Panel 2: Children who did not transition
+
+```{r}
+# Get only children that did not transition from not overweight to overweight
+data_panel_2 <- data[!((data$w1_bmi < 25) & (data$w5_bmi > 30)),]
+
+ols3 = lm(w5_bmi ~  
+                  # Wave 5 habits
+                  + w5_exercise
+                  # Wave 1 background
+                  + BIO_SEX
+                  + w1_ethnicity
+                  + w1_urbanity
+                  + w1_income_1994_log_win
+                  # Wave 1 baseline health indicators
+                  + w1_bmi
+                  + w1_general_health_int
+                  # Dieting educational factors
+                  + w1_learned_diet
+                  + w1_dinner_with_parents
+                  + w1_learned_problems_obesity
+                  + w1_learned_importance_exercise
+                  + w1_usual_breakfast_cereal
+                  + w1_usual_breakfast_fruit
+                  + w1_usual_breakfast_eggs
+                  + w1_usual_breakfast_meat
+                  + w1_usual_breakfast_snack
+                  + w1_usual_breakfast_bread
+         , data=data_panel_2)
+
+stargazer(ols3,
+          type="text",
+          single.row = TRUE,
+          header = FALSE,
+          title = "Panel 2: Children who did not transition")
+```
+
+## Logit model: Explaining the transition
 
 ```{r}
 logit = glm(w5_become_overweight ~  
@@ -885,6 +933,26 @@ logit = glm(w5_become_overweight ~
                   + w1_usual_breakfast_meat
                   + w1_usual_breakfast_snack
                   + w1_usual_breakfast_bread
+            , family = 'binomial'
+         , data=data)
+
+stargazer(logit,
+          type="text",
+          single.row = TRUE,
+          header = FALSE,
+          title = "Logit regression - Become overweight")
+```
+
+```{r}
+logit = glm(w5_become_overweight ~  
+                  # Wave 1 background
+                  + BIO_SEX
+                  + w1_ethnicity
+                  + w1_income_1994_log_win
+                  # Wave 1 baseline health indicators
+                  + w1_general_health_int
+                  # Dieting educational factors
+                  + w1_bmi
             , family = 'binomial'
          , data=data)
 
